@@ -57,7 +57,12 @@ bot.use(async (ctx, next) => {
     await ctx.reply(`Your chat id is ${id}. Put TELEGRAM_CHAT_ID=${id} in .env and restart PerpPilot.`);
     return;
   }
-  if (id !== CHAT_ID) return; // ignore everyone else, silently
+  if (id !== CHAT_ID) {
+    // Ignored, but say so in the terminal: a wrong TELEGRAM_CHAT_ID otherwise
+    // looks exactly like a bot that is not running.
+    console.log(`ignored a message from chat ${id} (TELEGRAM_CHAT_ID is ${CHAT_ID}). If that is you, set TELEGRAM_CHAT_ID=${id}`);
+    return;
+  }
   await next();
 });
 
@@ -319,7 +324,21 @@ bot.command("trades", (ctx) => {
 bot.catch((err) => console.error(`telegram handler error: ${err.message}`));
 
 async function main(): Promise<void> {
-  const lines = await pilot.selfCheck();
+  // Telegram first: a slow or failing chain check must not keep the bot deaf.
+  const me = await bot.api.getMe().catch((err: Error) => {
+    throw new Error(`Telegram rejected TELEGRAM_BOT_TOKEN (${err.message}). Copy the token from @BotFather again.`);
+  });
+  console.log(`Telegram: connected as @${me.username}${CHAT_ID ? ` · answering chat ${CHAT_ID}` : " · TELEGRAM_CHAT_ID not set yet: send /start to the bot"}`);
+
+  let lines: string[];
+  try {
+    lines = await Promise.race([
+      pilot.selfCheck(),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timed out after 30 s")), 30_000)),
+    ]);
+  } catch (err) {
+    lines = [`chain check failed: ${explain((err as Error).message)} (the bot still runs; try /status)`];
+  }
   for (const l of lines) console.log(l);
   await bot.api.setMyCommands([
     { command: "pos", description: "Positions, PnL, liquidation price, health" },
@@ -336,7 +355,7 @@ async function main(): Promise<void> {
   ]);
   guard.start();
   if (CHAT_ID) await send(`🚀 PerpPilot is up\n${esc(lines.join("\n"))}\n\n/help for commands`).catch(() => undefined);
-  console.log("PerpPilot running. Ctrl+C to stop.");
+  console.log(`PerpPilot running. Open https://t.me/${me.username} and send /start. Ctrl+C to stop.`);
   const stop = () => {
     guard.stop();
     void bot.stop();
