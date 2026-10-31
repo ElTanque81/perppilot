@@ -1,0 +1,28 @@
+{
+  "name": "perppilot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Telegram co-pilot for dreamDEX perps on Somnia Tokyo testnet: trade from chat, see positions and liquidation prices, and let a margin guard warn, trim or flatten before liquidation.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "doctor": "tsx src/doctor.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@somnia-chain/markets-sdk": "^0.32.1",
+    "dotenv": "^18.0.9",
+    "grammy": "^1.46.0",
+    "viem": "^2.57.13"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
