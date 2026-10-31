@@ -129,6 +129,28 @@ export interface PerpConfig {
   dryRun: boolean;
 }
 
+/**
+ * Accept the shapes wallets export a key in: with or without 0x, quoted, with
+ * stray spaces. Anything else gets a message that says what was pasted instead.
+ * (PerpPilot addition.)
+ */
+function normalizeKey(raw: string | undefined): string {
+  let k = (raw ?? "").trim().replace(/^["']|["']$/g, "").trim();
+  if (!k) return "";
+  if (/\s/.test(k) && k.split(/\s+/).length >= 12) {
+    throw new Error("PRIVATE_KEY looks like a seed phrase (several words). Export the account's private key instead: 64 hex characters.");
+  }
+  k = k.replace(/\s+/g, "");
+  if (!/^0x/i.test(k)) k = `0x${k}`;
+  if (/^0x[0-9a-fA-F]{40}$/.test(k)) {
+    throw new Error("PRIVATE_KEY is a wallet ADDRESS (40 hex characters). Put the bot wallet's private key here (64 hex characters); the address goes to Link a bot in the app.");
+  }
+  if (!/^0x[0-9a-fA-F]{64}$/.test(k)) {
+    throw new Error(`PRIVATE_KEY must be 64 hex characters (optionally starting with 0x); this one has ${k.length - 2} characters after 0x or contains other symbols.`);
+  }
+  return k;
+}
+
 /** The networks a perp bot can run on, in the order the error lists them. */
 const PERP_NETWORKS: readonly Network[] = ["hideki", "testnet"];
 
@@ -154,7 +176,7 @@ export function loadConfig(): PerpConfig {
   }
   const network = raw as Network;
   const ep = ENDPOINTS[network];
-  const pk = (process.env.PRIVATE_KEY ?? "").trim();
+  const pk = normalizeKey(process.env.PRIVATE_KEY);
   const registry = (process.env.OPERATOR_PERMISSIONS_REGISTRY ?? "").trim();
   const ownerRaw = (process.env.OWNER_ADDRESS ?? "").trim();
   if (ownerRaw && !isAddress(ownerRaw)) {
